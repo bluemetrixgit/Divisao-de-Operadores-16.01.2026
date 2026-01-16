@@ -113,6 +113,7 @@ if all(arquivos.values()):
     try:
         with sl.spinner("🔄 Processando arquivos..."):
 
+            # -------- BTG --------
             sl.write("⚙ Processando BTG")
             try:
                 btg_processado = divisao_btg(
@@ -123,6 +124,7 @@ if all(arquivos.values()):
                 sl.exception(e)
                 sl.stop()
 
+            # -------- XP --------
             sl.write("⚙ Processando XP")
             try:
                 xp_processado = divisao_xp(arquivos["Saldo XP"])
@@ -131,6 +133,7 @@ if all(arquivos.values()):
                 sl.exception(e)
                 sl.stop()
 
+            # -------- Ágora --------
             sl.write("⚙ Processando Ágora")
             try:
                 agora_processado = divisao_agora(arquivos["Saldo Ágora"])
@@ -139,6 +142,7 @@ if all(arquivos.values()):
                 sl.exception(e)
                 sl.stop()
 
+            # -------- Controle --------
             sl.write("⚙ Processando Planilha de Controle")
             try:
                 controle_processado = coleta_controle(
@@ -174,7 +178,14 @@ if all(arquivos.values()):
             "Ágora": agora
         }[corretora_selecionada]
 
-        contagem_operador = df_selecionado["Operador"].value_counts()
+        # 🔒 BLINDAGEM DO OPERADOR
+        df_selecionado["Operador"] = (
+            df_selecionado["Operador"]
+            .astype(str)
+            .replace("nan", None)
+        )
+
+        contagem_operador = df_selecionado["Operador"].dropna().value_counts()
 
         with col2:
             sl.markdown("##### 📌 Contagem de Operadores:")
@@ -183,14 +194,25 @@ if all(arquivos.values()):
 
         sl.divider()
 
-        operador_selecionado = sl.selectbox(
-            "Escolha o operador",
-            sorted(df_selecionado["Operador"].unique())
+        # ✅ CORREÇÃO DEFINITIVA DO ERRO float x str
+        operadores = (
+            df_selecionado["Operador"]
+            .dropna()
+            .astype(str)
+            .unique()
         )
 
-        df_filtrado = df_selecionado[
-            df_selecionado["Operador"] == operador_selecionado
-        ].reset_index(drop=True)
+        operador_selecionado = sl.selectbox(
+            "Escolha o operador",
+            sorted(operadores)
+        )
+
+        df_filtrado = (
+            df_selecionado[
+                df_selecionado["Operador"] == operador_selecionado
+            ]
+            .reset_index(drop=True)
+        )
 
         if df_filtrado.empty:
             sl.warning("⚠ Nenhum registro encontrado para o operador selecionado.")
@@ -214,6 +236,7 @@ if all(arquivos.values()):
 
         df_filtrado["Observações"] = df_filtrado["Observações"].fillna("🏳‍🌈")
 
+        # 🚨 Proteção para tabelas grandes
         if df_filtrado.shape[0] > 5000:
             sl.warning(
                 "⚠ Muitos registros para exibição com estilo. "
