@@ -1,1 +1,1 @@
-# Divis-o-de-Operadores-16.1.2026
+# Divisao-de-Operadores-16.1.2026
