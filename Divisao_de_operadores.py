@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+
 """
 Created on Sat Mar  1 17:41:44 2025
 @author: Marqu
