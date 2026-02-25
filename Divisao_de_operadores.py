@@ -234,7 +234,7 @@ if all(arquivos.values()):
              "Carteira", "Observações", "Valor"]
         ]
 
-        df_filtrado["Observações"] = df_filtrado["Observações"].fillna("Marcus da o butico e Gabriel olha")
+        df_filtrado["Observações"] = df_filtrado["Observações"].fillna("")
 
         # 🚨 Proteção para tabelas grandes
         if df_filtrado.shape[0] > 5000:
