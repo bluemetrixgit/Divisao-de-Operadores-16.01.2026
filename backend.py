@@ -74,7 +74,7 @@ def divisao_btg(saldo_btg, pl_btg):
         .str.strip()
     )
 
-    saldobtg["Saldo"] = pd.to_numeric(saldobtG["Saldo"], errors="coerce")
+    saldobtg["Saldo"] = pd.to_numeric(saldobtg["Saldo"], errors="coerce")
 
     df_saldo_btg = saldobtg.merge(plbtg, on="Conta", how="outer")
 
