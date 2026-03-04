@@ -57,7 +57,7 @@ def divisao_btg(saldo_btg, pl_btg):
     )
 
     # Padroniza Conta nos dois dataframes
-    for df in [saldobtG, plbtg]:
+    for df in [saldobtg, plbtg]:
         df["Conta"] = (
             df["Conta"]
             .astype(str)
