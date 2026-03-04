@@ -164,7 +164,6 @@ def divisao_agora(saldo_agora):
 # =========================
 def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
 
-    # Garantindo padronização geral
     for df in [divisao_btg, divisao_xp, divisao_agora, controle]:
         df["Conta"] = (
             df["Conta"]
@@ -173,6 +172,21 @@ def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
             .str.strip()
         )
 
+    # 🔥 TROCA AQUI
+    btg = divisao_btg.merge(controle, on="Conta", how="left")
+    xp = divisao_xp.merge(controle, on="Conta", how="left")
+    agora = divisao_agora.merge(controle, on="Conta", how="left")
+
+    # Saldo numérico
+    for df in [btg, xp, agora]:
+        df["Saldo"] = pd.to_numeric(df["Saldo"], errors="coerce")
+
+    # Filtro
+    btg = btg[(btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)]
+    xp = xp[(xp["Saldo"] >= 1000) | (xp["Saldo"] < 0)]
+    agora = agora[(agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)]
+
+    return btg, xp, agora
     # Merge
     btg = divisao_btg.merge(controle, on="Conta", how="inner")
     xp = divisao_xp.merge(controle, on="Conta", how="inner")
