@@ -56,8 +56,8 @@ def divisao_btg(saldo_btg, pl_btg):
         skipfooter=2
     )
 
-    # Padroniza Conta
-    for df in [saldobt, plbtg]:
+    # Padroniza Conta nos dois dataframes
+    for df in [saldobtG, plbtg]:
         df["Conta"] = (
             df["Conta"]
             .astype(str)
@@ -65,7 +65,7 @@ def divisao_btg(saldo_btg, pl_btg):
             .str.strip()
         )
 
-    # 🔥 CONVERSÃO CORRETA DO SALDO
+    # 🔥 Converte saldo corretamente (essa é a parte crítica)
     saldobtg["Saldo"] = (
         saldobtg["Saldo"]
         .astype(str)
@@ -74,7 +74,7 @@ def divisao_btg(saldo_btg, pl_btg):
         .str.strip()
     )
 
-    saldobtg["Saldo"] = pd.to_numeric(saldobt["Saldo"], errors="coerce")
+    saldobtg["Saldo"] = pd.to_numeric(saldobtG["Saldo"], errors="coerce")
 
     df_saldo_btg = saldobtg.merge(plbtg, on="Conta", how="outer")
 
