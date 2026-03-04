@@ -119,12 +119,3 @@ def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle) :
     
     
     return btg, xp, agora
-    
-    
-
-    
-
-
-
-
-
