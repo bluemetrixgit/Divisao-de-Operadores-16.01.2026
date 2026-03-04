@@ -22,7 +22,7 @@ def coleta_controle(controle):
             skiprows=1,
             skipfooter=5,
             usecols=["Conta", "Cliente", "Corretora", "Operador",
-                     "Status", "Carteira", "Observações", "Situação", "BP"]  # Adicionada "BP" para Ágora
+                     "Status", "Carteira", "Observações", "Situação"]
         )
         dataframes.append(planilha)
     
@@ -42,8 +42,10 @@ def divisao_btg(saldo_btg, pl_btg):
     
     df = saldobtg.merge(plbtg, on="Conta", how="outer")
     
+    # Garante que Valor seja numérico
     df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
     
+    # Função que define o operador
     def atribuir_operador(pl):
         if pl < 250_000:
             return "David"
@@ -59,7 +61,7 @@ def divisao_btg(saldo_btg, pl_btg):
 
 def divisao_xp(saldo_xp):
     """
-    Processa XP (operador vem da planilha de controle depois)
+    Processa XP (mantém igual - operador vem da planilha de controle depois)
     """
     saldoxp = pd.read_excel(saldo_xp, usecols=["COD. CLIENTE", "PATRIMÔNIO TOTAL", "D0"])
     
@@ -75,7 +77,7 @@ def divisao_xp(saldo_xp):
 
 def divisao_agora(saldo_agora):
     """
-    Processa saldo da Ágora (PL será trazido depois via merge com "BP")
+    Processa Ágora (mantém igual - operador vem da planilha de controle depois)
     """
     saldoagora = pd.read_excel(saldo_agora, usecols=["CBLC", "Disponivel"])
 
@@ -83,59 +85,50 @@ def divisao_agora(saldo_agora):
     saldoagora = saldoagora.rename(mapper=mapper, axis=1)
 
     saldoagora["Conta"] = saldoagora["Conta"].replace("-", "", regex=True)
-    saldoagora["Conta"] = pd.to_numeric(saldoagora["Conta"], errors="coerce").astype("Int64")  # mais seguro
+    saldoagora["Conta"] = saldoagora["Conta"].astype(int)
 
     saldoagora["Saldo"] = (
         saldoagora["Saldo"]
         .astype(str)
         .str.strip()
-        .str.replace(".", "", regex=False)   # remove separador de milhar se houver
-        .str.replace(",", ".", regex=False)
     )
     saldoagora["Saldo"] = pd.to_numeric(saldoagora["Saldo"], errors="coerce")
 
-    # NÃO criamos Valor aqui → será trazido do merge com "BP" da planilha de controle
+    saldoagora["Valor"] = np.nan
+
     return saldoagora
 
 
 def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
     """
-    Junta os dados e trata PL/Valor de forma específica por corretora:
-    - BTG: Valor do arquivo PL BTG + Operador manual
-    - XP:  Valor do arquivo Saldo XP
-    - Ágora: Valor = coluna "BP" da aba Ágora da planilha de controle
+    Junta os dados de cada corretora com a planilha de controle,
+    preservando o Operador manual do BTG e usando o da planilha para XP e Ágora.
     """
     # ────────────────────────────────────────────────
-    # BTG → Operador manual (do PL), Valor já existe
+    # BTG → usa Operador calculado no PL (manual)
     # ────────────────────────────────────────────────
     btg = divisao_btg.merge(
         controle,
         on="Conta",
         how="inner",
-        suffixes=("_pl", "")
+        suffixes=("_pl", "")   # evita conflito se existir "Operador" na planilha
     )
-    # Prioriza Operador manual
+
+    # Prioriza o Operador que veio do PL (coluna criada em divisao_btg)
+    # Se por algum motivo não existir, usa o da planilha como fallback (mas não deve acontecer)
     if "Operador_pl" in btg.columns:
         btg["Operador"] = btg["Operador_pl"]
-    # Limpa colunas temporárias
+    # Remove colunas duplicadas / temporárias
     cols_to_drop = [col for col in btg.columns if col.endswith("_pl")]
     btg = btg.drop(columns=cols_to_drop, errors="ignore")
 
     # ────────────────────────────────────────────────
-    # XP → normal
+    # XP e Ágora → usam normalmente o Operador da planilha de controle
     # ────────────────────────────────────────────────
     xp = divisao_xp.merge(controle, on="Conta", how="inner")
-
-    # ────────────────────────────────────────────────
-    # Ágora → traz PL da coluna "BP" e renomeia para "Valor"
-    # ────────────────────────────────────────────────
     agora = divisao_agora.merge(controle, on="Conta", how="inner")
-    # Renomeia BP → Valor (consistência com outras corretoras)
-    if "BP" in agora.columns:
-        agora["Valor"] = pd.to_numeric(agora["BP"], errors="coerce")
-        agora = agora.drop(columns=["BP"], errors="ignore")  # remove original se quiser
 
-    # Ajustes finais de tipo e filtro
+    # Ajustes finais de tipo e filtro de saldo
     agora["Saldo"] = agora["Saldo"].astype(float)
 
     selecao_btg   = (btg["Saldo"]   >= 1000) | (btg["Saldo"]   < 0)
