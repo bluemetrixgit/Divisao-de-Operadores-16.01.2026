@@ -5,61 +5,47 @@ Created on Fri Feb 28 17:56:31 2025
 @author: Marco Marques de Castro
 """
 
-# Importação de bibliotecas
 import pandas as pd
 import numpy as np
 
-"""
-Definindo função para coletar dados da planilha de controle
-"""
 def coleta_controle(controle):
-    
-    # Lendo planilha de controle
+    """
+    Lê a planilha de controle e agrega as abas BTG, XP e Ágora
+    """
     planilha_controle = pd.ExcelFile(controle)
-    
-    # Criando lista com as corretoras
     corretoras = ["BTG", "XP", "Ágora"]
-    
-    # Criando lista para armazenar os data frames
     dataframes = []
     
-    # Iteração para pegar colunas específicas de cada planilha de cada corretora
     for c in corretoras:
-        
-        # Lendo planilha por corretora e selecionando colunas específicas
-        planilha = planilha_controle.parse(c, skiprows=1, skipfooter=5, usecols=["Conta", "Cliente", 
-                                                                                 "Corretora", "Operador",
-                                                                                 "Status", "Carteira", 
-                                                                                 "Observações", "Situação"])
-        # Adicionando data frame a lista 
+        planilha = planilha_controle.parse(
+            c,
+            skiprows=1,
+            skipfooter=5,
+            usecols=["Conta", "Cliente", "Corretora", "Operador",
+                     "Status", "Carteira", "Observações", "Situação"]
+        )
         dataframes.append(planilha)
-        
-    # Criando data frame agregado
-    df_agregado = pd.concat(dataframes, ignore_index=True)  
     
-    return df_agregado 
-        
-"""
-Definindo função para gerar divisão do BTG - AGORA COM REGRA MANUAL DE OPERADOR PELO PL
-"""
+    df_agregado = pd.concat(dataframes, ignore_index=True)
+    return df_agregado
+
+
 def divisao_btg(saldo_btg, pl_btg):
     """
-    Gera divisão do BTG e define operador MANUALMENTE com base no PL:
-    - PL < 250k     → David
-    - 250k ≤ PL ≤ 800k → Gabriel
-    - PL > 800k     → Marcus
+    Processa BTG e define operador MANUALMENTE com base no PL:
+      PL < 250.000     → David
+      250.000 ≤ PL ≤ 800.000 → Gabriel
+      PL > 800.000     → Marcus
     """
-    # Lendo arquivos de saldo e PL
     saldobtg = pd.read_excel(saldo_btg, usecols=["Conta", "Saldo"], skipfooter=2)
     plbtg    = pd.read_excel(pl_btg,    usecols=["Conta", "Valor"], skipfooter=2)
     
-    # Join saldo + PL
     df = saldobtg.merge(plbtg, on="Conta", how="outer")
     
-    # Garantir que Valor seja numérico (pode ter NaN ou texto sujo)
+    # Garante que Valor seja numérico
     df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
     
-    # Definir operador de forma manual baseada no PL (coluna Valor)
+    # Função que define o operador
     def atribuir_operador(pl):
         if pl < 250_000:
             return "David"
@@ -71,69 +57,86 @@ def divisao_btg(saldo_btg, pl_btg):
     df["Operador"] = df["Valor"].apply(atribuir_operador)
     
     return df
-    
-"""
-Definindo função para gerar divisão da XP
-"""
+
+
 def divisao_xp(saldo_xp):
-    
-    # Lendo arquivo de saldo xp
+    """
+    Processa XP (mantém igual - operador vem da planilha de controle depois)
+    """
     saldoxp = pd.read_excel(saldo_xp, usecols=["COD. CLIENTE", "PATRIMÔNIO TOTAL", "D0"])
     
-    # Mudando o nome da coluna 'COD.CLIENTE', 'PATRIMÔNIO TOTAL' e 'D0' para 'Conta', 'Valor', 'Saldo'
-    mapper = {"COD. CLIENTE" : "Conta", "PATRIMÔNIO TOTAL" : "Valor", "D0" : "Saldo"}
+    mapper = {
+        "COD. CLIENTE": "Conta",
+        "PATRIMÔNIO TOTAL": "Valor",
+        "D0": "Saldo"
+    }
     saldoxp = saldoxp.rename(mapper=mapper, axis=1)
     
     return saldoxp
 
-"""Definindo função para gerar divisão da Ágora"""
+
 def divisao_agora(saldo_agora):
-    # Lendo arquivo de saldo da Ágora
+    """
+    Processa Ágora (mantém igual - operador vem da planilha de controle depois)
+    """
     saldoagora = pd.read_excel(saldo_agora, usecols=["CBLC", "Disponivel"])
 
-    # Renomeando colunas
     mapper = {"CBLC": "Conta", "Disponivel": "Saldo"}
     saldoagora = saldoagora.rename(mapper=mapper, axis=1)
 
-    # Trocando '-' por vazio na coluna 'Conta'
     saldoagora["Conta"] = saldoagora["Conta"].replace("-", "", regex=True)
-
-    # Convertendo 'Conta' para numérico
     saldoagora["Conta"] = saldoagora["Conta"].astype(int)
 
-    # Convertendo 'Saldo' de texto para float
     saldoagora["Saldo"] = (
         saldoagora["Saldo"]
         .astype(str)
-        .str.strip()            # remove espaços no início/fim
+        .str.strip()
     )
-    saldoagora["Saldo"] = pd.to_numeric(saldoagora["Saldo"], errors="coerce")  # converte para float
+    saldoagora["Saldo"] = pd.to_numeric(saldoagora["Saldo"], errors="coerce")
 
-    # Criando coluna 'Valor'
     saldoagora["Valor"] = np.nan
 
     return saldoagora
 
 
-"""Definindo função para gerar uma planilha de divisão geral"""
 def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
-    
-    # Realizando join das planilhas por corretora com a planilha de controle
-    btg   = divisao_btg.merge(controle,   on="Conta", how="inner")
-    xp    = divisao_xp.merge(controle,    on="Conta", how="inner")
+    """
+    Junta os dados de cada corretora com a planilha de controle,
+    preservando o Operador manual do BTG e usando o da planilha para XP e Ágora.
+    """
+    # ────────────────────────────────────────────────
+    # BTG → usa Operador calculado no PL (manual)
+    # ────────────────────────────────────────────────
+    btg = divisao_btg.merge(
+        controle,
+        on="Conta",
+        how="inner",
+        suffixes=("_pl", "")   # evita conflito se existir "Operador" na planilha
+    )
+
+    # Prioriza o Operador que veio do PL (coluna criada em divisao_btg)
+    # Se por algum motivo não existir, usa o da planilha como fallback (mas não deve acontecer)
+    if "Operador_pl" in btg.columns:
+        btg["Operador"] = btg["Operador_pl"]
+    # Remove colunas duplicadas / temporárias
+    cols_to_drop = [col for col in btg.columns if col.endswith("_pl")]
+    btg = btg.drop(columns=cols_to_drop, errors="ignore")
+
+    # ────────────────────────────────────────────────
+    # XP e Ágora → usam normalmente o Operador da planilha de controle
+    # ────────────────────────────────────────────────
+    xp = divisao_xp.merge(controle, on="Conta", how="inner")
     agora = divisao_agora.merge(controle, on="Conta", how="inner")
 
-    # Mudando o tipo de variável da coluna 'Saldo' do data frame da Ágora
+    # Ajustes finais de tipo e filtro de saldo
     agora["Saldo"] = agora["Saldo"].astype(float)
-    
-    # Selecionando clientes com 'Saldo' maior ou igual a 1000 e menores que 0
-    selecao_maior_1000_btg   = (btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)
-    selecao_maior_1000_xp    = (xp["Saldo"] >= 1000)  | (xp["Saldo"] < 0)
-    selecao_maior_1000_agora = (agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)
-    
-    # Aplicando seleção anterior
-    btg   = btg[selecao_maior_1000_btg]
-    xp    = xp[selecao_maior_1000_xp]
-    agora = agora[selecao_maior_1000_agora]
-    
+
+    selecao_btg   = (btg["Saldo"]   >= 1000) | (btg["Saldo"]   < 0)
+    selecao_xp    = (xp["Saldo"]    >= 1000) | (xp["Saldo"]    < 0)
+    selecao_agora = (agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)
+
+    btg   = btg[selecao_btg].copy()
+    xp    = xp[selecao_xp].copy()
+    agora = agora[selecao_agora].copy()
+
     return btg, xp, agora
