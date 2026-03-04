@@ -45,8 +45,8 @@ Definindo função para gerar divisão do BTG
 def divisao_btg(saldo_btg, pl_btg) :
     
     # Lendo arquivos de saldo e pl respectivamente
-    saldobtg = pd.read_excel(saldo_btg, usecols=["Conta", "Saldo"])
-    plbtg = pd.read_excel(pl_btg, usecols=["Conta", "Valor"])
+    saldobtg = pd.read_excel(saldo_btg, usecols=["Conta", "Saldo"], skipfooter=2)
+    plbtg = pd.read_excel(pl_btg, usecols=["Conta", "Valor"], skipfooter=2)
     
     # Realizando join com os data frames de saldo e pl
     df_saldo_btg = saldobtg.merge(plbtg, on="Conta", how="outer")
@@ -123,6 +123,7 @@ def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle) :
     
 
     
+
 
 
 
