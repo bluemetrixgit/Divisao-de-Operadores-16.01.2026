@@ -145,25 +145,49 @@ def divisao_agora(saldo_agora):
 # =========================
 # DIVISÃO FINAL
 # =========================
+def normalizar_conta_forte(df):
+    df["Conta"] = (
+        df["Conta"]
+        .astype(str)
+        .str.replace(".0", "", regex=False)
+        .str.replace("-", "", regex=False)
+        .str.replace(" ", "", regex=False)
+        .str.strip()
+        .str.zfill(8)   # 🔥 força tamanho padrão (ajuste se necessário)
+    )
+    return df
+
+
 def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
 
-    # Padroniza Conta em todos
-    for df in [divisao_btg, divisao_xp, divisao_agora, controle]:
-        df["Conta"] = (
-            df["Conta"]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
+    # 🔥 NORMALIZAÇÃO FORTE
+    divisao_btg = normalizar_conta_forte(divisao_btg)
+    divisao_xp = normalizar_conta_forte(divisao_xp)
+    divisao_agora = normalizar_conta_forte(divisao_agora)
+    controle = normalizar_conta_forte(controle)
 
-    btg = divisao_btg.merge(controle, on="Conta", how="inner")
-    xp = divisao_xp.merge(controle, on="Conta", how="inner")
-    agora = divisao_agora.merge(controle, on="Conta", how="inner")
+    # 🔥 MERGE CONTROLADO COM INDICADOR
+    btg = divisao_btg.merge(
+        controle,
+        on="Conta",
+        how="left",
+        indicator=True
+    )
 
-    # Garante saldo numérico
+    # Debug temporário (pode remover depois)
+    print("BTG merge status:")
+    print(btg["_merge"].value_counts())
+
+    btg = btg.drop(columns=["_merge"])
+
+    xp = divisao_xp.merge(controle, on="Conta", how="left")
+    agora = divisao_agora.merge(controle, on="Conta", how="left")
+
+    # Saldo numérico
     for df in [btg, xp, agora]:
         df["Saldo"] = pd.to_numeric(df["Saldo"], errors="coerce")
 
+    # Filtro >= 1000 ou negativo
     btg = btg[(btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)]
     xp = xp[(xp["Saldo"] >= 1000) | (xp["Saldo"] < 0)]
     agora = agora[(agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)]
