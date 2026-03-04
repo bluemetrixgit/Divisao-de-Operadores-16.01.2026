@@ -12,7 +12,7 @@ import numpy as np
 """
 Definindo função para coletar dados da planilha de controle
 """
-def coleta_controle(controle) :
+def coleta_controle(controle):
     
     # Lendo planilha de controle
     planilha_controle = pd.ExcelFile(controle)
@@ -24,7 +24,7 @@ def coleta_controle(controle) :
     dataframes = []
     
     # Iteração para pegar colunas específicas de cada planilha de cada corretora
-    for c in corretoras :
+    for c in corretoras:
         
         # Lendo planilha por corretora e selecionando colunas específicas
         planilha = planilha_controle.parse(c, skiprows=1, skipfooter=5, usecols=["Conta", "Cliente", 
@@ -40,23 +40,42 @@ def coleta_controle(controle) :
     return df_agregado 
         
 """
-Definindo função para gerar divisão do BTG
+Definindo função para gerar divisão do BTG - AGORA COM REGRA MANUAL DE OPERADOR PELO PL
 """
-def divisao_btg(saldo_btg, pl_btg) :
-    
-    # Lendo arquivos de saldo e pl respectivamente
+def divisao_btg(saldo_btg, pl_btg):
+    """
+    Gera divisão do BTG e define operador MANUALMENTE com base no PL:
+    - PL < 250k     → David
+    - 250k ≤ PL ≤ 800k → Gabriel
+    - PL > 800k     → Marcus
+    """
+    # Lendo arquivos de saldo e PL
     saldobtg = pd.read_excel(saldo_btg, usecols=["Conta", "Saldo"], skipfooter=2)
-    plbtg = pd.read_excel(pl_btg, usecols=["Conta", "Valor"], skipfooter=2)
+    plbtg    = pd.read_excel(pl_btg,    usecols=["Conta", "Valor"], skipfooter=2)
     
-    # Realizando join com os data frames de saldo e pl
-    df_saldo_btg = saldobtg.merge(plbtg, on="Conta", how="outer")
+    # Join saldo + PL
+    df = saldobtg.merge(plbtg, on="Conta", how="outer")
     
-    return df_saldo_btg
+    # Garantir que Valor seja numérico (pode ter NaN ou texto sujo)
+    df["Valor"] = pd.to_numeric(df["Valor"], errors="coerce").fillna(0)
+    
+    # Definir operador de forma manual baseada no PL (coluna Valor)
+    def atribuir_operador(pl):
+        if pl < 250_000:
+            return "David"
+        elif pl <= 800_000:
+            return "Gabriel"
+        else:
+            return "Marcus"
+    
+    df["Operador"] = df["Valor"].apply(atribuir_operador)
+    
+    return df
     
 """
 Definindo função para gerar divisão da XP
 """
-def divisao_xp(saldo_xp) :
+def divisao_xp(saldo_xp):
     
     # Lendo arquivo de saldo xp
     saldoxp = pd.read_excel(saldo_xp, usecols=["COD. CLIENTE", "PATRIMÔNIO TOTAL", "D0"])
@@ -87,7 +106,6 @@ def divisao_agora(saldo_agora):
         saldoagora["Saldo"]
         .astype(str)
         .str.strip()            # remove espaços no início/fim
-    
     )
     saldoagora["Saldo"] = pd.to_numeric(saldoagora["Saldo"], errors="coerce")  # converte para float
 
@@ -98,24 +116,24 @@ def divisao_agora(saldo_agora):
 
 
 """Definindo função para gerar uma planilha de divisão geral"""
-def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle) :
+def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
     
     # Realizando join das planilhas por corretora com a planilha de controle
-    btg = divisao_btg.merge(controle, on="Conta", how="inner")
-    xp = divisao_xp.merge(controle, on="Conta", how="inner")
+    btg   = divisao_btg.merge(controle,   on="Conta", how="inner")
+    xp    = divisao_xp.merge(controle,    on="Conta", how="inner")
     agora = divisao_agora.merge(controle, on="Conta", how="inner")
 
     # Mudando o tipo de variável da coluna 'Saldo' do data frame da Ágora
     agora["Saldo"] = agora["Saldo"].astype(float)
+    
     # Selecionando clientes com 'Saldo' maior ou igual a 1000 e menores que 0
-    selecao_maior_1000_btg = (btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)
-    selecao_maior_1000_xp = (xp["Saldo"] >= 1000) | (xp["Saldo"] < 0)
+    selecao_maior_1000_btg   = (btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)
+    selecao_maior_1000_xp    = (xp["Saldo"] >= 1000)  | (xp["Saldo"] < 0)
     selecao_maior_1000_agora = (agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)
     
     # Aplicando seleção anterior
-    btg = btg[selecao_maior_1000_btg]
-    xp = xp[selecao_maior_1000_xp]
+    btg   = btg[selecao_maior_1000_btg]
+    xp    = xp[selecao_maior_1000_xp]
     agora = agora[selecao_maior_1000_agora]
-    
     
     return btg, xp, agora
