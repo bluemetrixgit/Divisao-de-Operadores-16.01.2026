@@ -1,195 +1,128 @@
 # -*- coding: utf-8 -*-
+"""
+Created on Fri Feb 28 17:56:31 2025
 
+@author: Marco Marques de Castro
+"""
+
+# Importação de bibliotecas
 import pandas as pd
 import numpy as np
 
-
-# =========================
-# CONTROLE
-# =========================
-def coleta_controle(controle):
-
+"""
+Definindo função para coletar dados da planilha de controle
+"""
+def coleta_controle(controle) :
+    
+    # Lendo planilha de controle
     planilha_controle = pd.ExcelFile(controle)
+    
+    # Criando lista com as corretoras
     corretoras = ["BTG", "XP", "Ágora"]
+    
+    # Criando lista para armazenar os data frames
     dataframes = []
-
-    for c in corretoras:
-        planilha = planilha_controle.parse(
-            c,
-            skiprows=1,
-            skipfooter=5,
-            usecols=[
-                "Conta", "Cliente", "Corretora", "Operador",
-                "Status", "Carteira", "Observações", "Situação"
-            ]
-        )
-
-        # Padroniza Conta
-        planilha["Conta"] = (
-            planilha["Conta"]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
-
+    
+    # Iteração para pegar colunas específicas de cada planilha de cada corretora
+    for c in corretoras :
+        
+        # Lendo planilha por corretora e selecionando colunas específicas
+        planilha = planilha_controle.parse(c, skiprows=1, skipfooter=5, usecols=["Conta", "Cliente", 
+                                                                                 "Corretora", "Operador",
+                                                                                 "Status", "Carteira", 
+                                                                                 "Observações", "Situação"])
+        # Adicionando data frame a lista 
         dataframes.append(planilha)
-
-    df_agregado = pd.concat(dataframes, ignore_index=True)
-
-    return df_agregado
-
-
-# =========================
-# BTG
-# =========================
-def divisao_btg(saldo_btg, pl_btg):
-
-    saldobtg = pd.read_excel(
-        saldo_btg,
-        usecols=["Conta", "Saldo"],
-        skipfooter=2
-    )
-
-    plbtg = pd.read_excel(
-        pl_btg,
-        usecols=["Conta", "Valor"],
-        skipfooter=2
-    )
-
-    # Padroniza Conta nos dois dataframes
-    for df in [saldobtg, plbtg]:
-        df["Conta"] = (
-            df["Conta"]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
-
-    # 🔥 Converte saldo corretamente (essa é a parte crítica)
-    saldobtg["Saldo"] = (
-        saldobtg["Saldo"]
-        .astype(str)
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False)
-        .str.strip()
-    )
-
-    saldobtg["Saldo"] = pd.to_numeric(saldobtg["Saldo"], errors="coerce")
-
+        
+    # Criando data frame agregado
+    df_agregado = pd.concat(dataframes, ignore_index=True)  
+    
+    return df_agregado 
+        
+"""
+Definindo função para gerar divisão do BTG
+"""
+def divisao_btg(saldo_btg, pl_btg) :
+    
+    # Lendo arquivos de saldo e pl respectivamente
+    saldobtg = pd.read_excel(saldo_btg, usecols=["Conta", "Saldo"], skipfooter=2)
+    plbtg = pd.read_excel(pl_btg, usecols=["Conta", "Valor"], skipfooter=2)
+    
+    # Realizando join com os data frames de saldo e pl
     df_saldo_btg = saldobtg.merge(plbtg, on="Conta", how="outer")
-
+    
     return df_saldo_btg
-
-
-# =========================
-# XP
-# =========================
-def divisao_xp(saldo_xp):
-
-    saldoxp = pd.read_excel(
-        saldo_xp,
-        usecols=["COD. CLIENTE", "PATRIMÔNIO TOTAL", "D0"]
-    )
-
-    mapper = {
-        "COD. CLIENTE": "Conta",
-        "PATRIMÔNIO TOTAL": "Valor",
-        "D0": "Saldo"
-    }
-
-    saldoxp = saldoxp.rename(columns=mapper)
-
-    saldoxp["Conta"] = (
-        saldoxp["Conta"]
-        .astype(str)
-        .str.replace(".0", "", regex=False)
-        .str.strip()
-    )
-
-    saldoxp["Saldo"] = pd.to_numeric(saldoxp["Saldo"], errors="coerce")
-
+    
+"""
+Definindo função para gerar divisão da XP
+"""
+def divisao_xp(saldo_xp) :
+    
+    # Lendo arquivo de saldo xp
+    saldoxp = pd.read_excel(saldo_xp, usecols=["COD. CLIENTE", "PATRIMÔNIO TOTAL", "D0"])
+    
+    # Mudando o nome da coluna 'COD.CLIENTE', 'PATRIMÔNIO TOTAL' e 'D0' para 'Conta', 'Valor', 'Saldo'
+    mapper = {"COD. CLIENTE" : "Conta", "PATRIMÔNIO TOTAL" : "Valor", "D0" : "Saldo"}
+    saldoxp = saldoxp.rename(mapper=mapper, axis=1)
+    
     return saldoxp
 
-
-# =========================
-# ÁGORA
-# =========================
+"""Definindo função para gerar divisão da Ágora"""
 def divisao_agora(saldo_agora):
+    # Lendo arquivo de saldo da Ágora
+    saldoagora = pd.read_excel(saldo_agora, usecols=["CBLC", "Disponivel"])
 
-    saldoagora = pd.read_excel(
-        saldo_agora,
-        usecols=["CBLC", "Disponivel"]
-    )
+    # Renomeando colunas
+    mapper = {"CBLC": "Conta", "Disponivel": "Saldo"}
+    saldoagora = saldoagora.rename(mapper=mapper, axis=1)
 
-    saldoagora = saldoagora.rename(
-        columns={"CBLC": "Conta", "Disponivel": "Saldo"}
-    )
+    # Trocando '-' por vazio na coluna 'Conta'
+    saldoagora["Conta"] = saldoagora["Conta"].replace("-", "", regex=True)
 
-    saldoagora["Conta"] = (
-        saldoagora["Conta"]
+    # Convertendo 'Conta' para numérico
+    saldoagora["Conta"] = saldoagora["Conta"].astype(int)
+
+    # Convertendo 'Saldo' de texto para float
+    saldoagora["Saldo"] = (
+        saldoagora["Saldo"]
         .astype(str)
-        .str.replace("-", "")
-        .str.strip()
+        .str.strip()            # remove espaços no início/fim
+    
     )
+    saldoagora["Saldo"] = pd.to_numeric(saldoagora["Saldo"], errors="coerce")  # converte para float
 
-    saldoagora["Saldo"] = pd.to_numeric(
-        saldoagora["Saldo"],
-        errors="coerce"
-    )
-
+    # Criando coluna 'Valor'
     saldoagora["Valor"] = np.nan
 
     return saldoagora
 
 
-# =========================
-# DIVISÃO FINAL
-# =========================
-def normalizar_conta_forte(df):
-    df["Conta"] = (
-        df["Conta"]
-        .astype(str)
-        .str.replace(".0", "", regex=False)
-        .str.replace("-", "", regex=False)
-        .str.replace(" ", "", regex=False)
-        .str.strip()
-        .str.zfill(8)   # 🔥 força tamanho padrão (ajuste se necessário)
-    )
-    return df
+"""Definindo função para gerar uma planilha de divisão geral"""
+def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle) :
+    
+    # Realizando join das planilhas por corretora com a planilha de controle
+    btg = divisao_btg.merge(controle, on="Conta", how="inner")
+    xp = divisao_xp.merge(controle, on="Conta", how="inner")
+    agora = divisao_agora.merge(controle, on="Conta", how="inner")
 
-
-def divisao_corretoras(divisao_btg, divisao_xp, divisao_agora, controle):
-
-    # 🔥 NORMALIZAÇÃO FORTE
-    divisao_btg = normalizar_conta_forte(divisao_btg)
-    divisao_xp = normalizar_conta_forte(divisao_xp)
-    divisao_agora = normalizar_conta_forte(divisao_agora)
-    controle = normalizar_conta_forte(controle)
-
-    # 🔥 MERGE CONTROLADO COM INDICADOR
-    btg = divisao_btg.merge(
-        controle,
-        on="Conta",
-        how="left",
-        indicator=True
-    )
-
-    # Debug temporário (pode remover depois)
-    print("BTG merge status:")
-    print(btg["_merge"].value_counts())
-
-    btg = btg.drop(columns=["_merge"])
-
-    xp = divisao_xp.merge(controle, on="Conta", how="left")
-    agora = divisao_agora.merge(controle, on="Conta", how="left")
-
-    # Saldo numérico
-    for df in [btg, xp, agora]:
-        df["Saldo"] = pd.to_numeric(df["Saldo"], errors="coerce")
-
-    # Filtro >= 1000 ou negativo
-    btg = btg[(btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)]
-    xp = xp[(xp["Saldo"] >= 1000) | (xp["Saldo"] < 0)]
-    agora = agora[(agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)]
-
+    # Mudando o tipo de variável da coluna 'Saldo' do data frame da Ágora
+    agora["Saldo"] = agora["Saldo"].astype(float)
+    # Selecionando clientes com 'Saldo' maior ou igual a 1000 e menores que 0
+    selecao_maior_1000_btg = (btg["Saldo"] >= 1000) | (btg["Saldo"] < 0)
+    selecao_maior_1000_xp = (xp["Saldo"] >= 1000) | (xp["Saldo"] < 0)
+    selecao_maior_1000_agora = (agora["Saldo"] >= 1000) | (agora["Saldo"] < 0)
+    
+    # Aplicando seleção anterior
+    btg = btg[selecao_maior_1000_btg]
+    xp = xp[selecao_maior_1000_xp]
+    agora = agora[selecao_maior_1000_agora]
+    
+    
     return btg, xp, agora
+    
+    
+
+    
+
+
+
